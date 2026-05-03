@@ -1,40 +1,71 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 
 type RGB = { r: number; g: number; b: number };
+type ViewerSettings = {
+	width?: number;
+	height?: number;
+	zoom?: number;
+	mode?: 'linear' | 'tilesheet';
+	tileWidth?: number;
+	tileHeight?: number;
+};
 
+// Remember the last folders and viewer options between runs.
+const LAST_IMAGE_DIR_KEY = 'spectrumViewer.lastImageDir';
+const LAST_PALETTE_DIR_KEY = 'spectrumViewer.lastPaletteDir';
+const VIEWER_SETTINGS_KEY = 'spectrumViewer.viewerSettings';
+
+/**
+ * Register the command that opens the raw-image viewer.
+ */
 export function activate(context: vscode.ExtensionContext) {
 
 	const command = vscode.commands.registerCommand('spectrumViewer.open', async () => {
+		const storedSettings = getStoredViewerSettings(context);
 
-		// Select RAW file (your "fake png")
+		// Pick the raw indexed image file.
 		const fileUri = await vscode.window.showOpenDialog({
 			title: "Select Raw Indexed File",
+			defaultUri: getDefaultOpenUri(context, LAST_IMAGE_DIR_KEY),
 			canSelectMany: false
 		});
 
-		if (!fileUri) return;
+		if (!fileUri) {
+			return;
+		}
+		await storeDirectoryForFile(context, LAST_IMAGE_DIR_KEY, fileUri[0]);
 
-		// Select GPL palette
+		// Pick the GPL palette file.
 		const paletteUri = await vscode.window.showOpenDialog({
 			title: "Select GPL Palette",
+			defaultUri: getDefaultOpenUri(context, LAST_PALETTE_DIR_KEY),
 			filters: { 'GIMP Palette': ['gpl'] },
 			canSelectMany: false
 		});
 
-		if (!paletteUri) return;
+		if (!paletteUri) {
+			return;
+		}
+		await storeDirectoryForFile(context, LAST_PALETTE_DIR_KEY, paletteUri[0]);
 
-		// Ask for width
+		// Ask for the image width. Height is worked out from the file size.
 		const widthInput = await vscode.window.showInputBox({
 			prompt: "Enter image width (pixels)",
+			value: storedSettings.width ? String(storedSettings.width) : undefined,
 			validateInput: (value) => {
 				const n = Number(value);
-				if (isNaN(n) || n <= 0) return "Enter a valid number";
+				if (isNaN(n) || n <= 0) {
+					return "Enter a valid number";
+				}
 				return null;
 			}
 		});
 
-		if (!widthInput) return;
+		if (!widthInput) {
+			return;
+		}
 
 		const width = parseInt(widthInput, 10);
 
@@ -46,10 +77,12 @@ export function activate(context: vscode.ExtensionContext) {
 			const { height, indices } = parseRawIndexed(rawBuffer, width);
 			const initialData = {
 				buffer: Array.from(rawBuffer),
-				palette
+				palette,
+				width,
+				height
 			};
 
-			// Validate palette coverage
+			// Warn if the image uses colours that the palette does not provide.
 			const maxIndex = Math.max(...indices);
 			if (maxIndex >= palette.length) {
 				vscode.window.showWarningMessage(
@@ -69,9 +102,20 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 			);
 
+			// The webview asks for data and reports setting changes through messages.
 			panel.webview.onDidReceiveMessage(async (message) => {
 				if (message.command === 'webviewReady') {
+					// Send saved options first, then send the current image data.
+					panel.webview.postMessage({
+						command: 'viewerSettings',
+						settings: getStoredViewerSettings(context)
+					});
 					panel.webview.postMessage(initialData);
+					return;
+				}
+
+				if (message.command === 'saveSettings') {
+					await storeViewerSettings(context, message.settings);
 					return;
 				}
 
@@ -79,10 +123,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 					const fileUri = await vscode.window.showOpenDialog({
 						title: "Select Raw Indexed File",
+						defaultUri: getDefaultOpenUri(context, LAST_IMAGE_DIR_KEY),
 						canSelectMany: false
 					});
 
-					if (!fileUri) return;
+					if (!fileUri) {
+						return;
+					}
+					await storeDirectoryForFile(context, LAST_IMAGE_DIR_KEY, fileUri[0]);
 
 					const rawBuffer = fs.readFileSync(fileUri[0].fsPath);
 
@@ -96,11 +144,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 					const paletteUri = await vscode.window.showOpenDialog({
 						title: "Select GPL Palette",
+						defaultUri: getDefaultOpenUri(context, LAST_PALETTE_DIR_KEY),
 						filters: { 'GIMP Palette': ['gpl'] },
 						canSelectMany: false
 					});
 
-					if (!paletteUri) return;
+					if (!paletteUri) {
+						return;
+					}
+					await storeDirectoryForFile(context, LAST_PALETTE_DIR_KEY, paletteUri[0]);
 
 					const paletteText = fs.readFileSync(paletteUri[0].fsPath, 'utf-8');
 					const palette = parseGPL(paletteText);
@@ -122,7 +174,54 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(command);
 }
 
-// 🔹 Parse RAW indexed buffer
+/**
+ * Read a saved folder path from global state.
+ */
+function getStoredDirectoryUri(context: vscode.ExtensionContext, key: string): vscode.Uri | undefined {
+	const storedPath = context.globalState.get<string>(key);
+	return storedPath ? vscode.Uri.file(storedPath) : undefined;
+}
+
+/**
+ * Pick the best starting folder for an open-file dialog.
+ * Uses the last saved folder first, then the active file, then the workspace.
+ */
+function getDefaultOpenUri(context: vscode.ExtensionContext, key: string): vscode.Uri | undefined {
+	const storedUri = getStoredDirectoryUri(context, key);
+	if (storedUri) {
+		return storedUri;
+	}
+
+	const activeUri = vscode.window.activeTextEditor?.document.uri;
+	if (activeUri?.scheme === 'file') {
+		return vscode.Uri.file(path.dirname(activeUri.fsPath));
+	}
+
+	return vscode.workspace.workspaceFolders?.[0]?.uri;
+}
+
+async function storeDirectoryForFile(context: vscode.ExtensionContext, key: string, fileUri: vscode.Uri) {
+	await context.globalState.update(key, path.dirname(fileUri.fsPath));
+}
+
+/**
+ * Read the saved viewer options.
+ */
+function getStoredViewerSettings(context: vscode.ExtensionContext): ViewerSettings {
+	return context.globalState.get<ViewerSettings>(VIEWER_SETTINGS_KEY) ?? {};
+}
+
+/**
+ * Save the latest viewer options sent by the webview.
+ */
+async function storeViewerSettings(context: vscode.ExtensionContext, settings: ViewerSettings) {
+	await context.globalState.update(VIEWER_SETTINGS_KEY, settings);
+}
+
+/**
+ * Convert raw bytes into palette indexes and calculate the image height.
+ * Throws when the byte count does not match the given width.
+ */
 function parseRawIndexed(buffer: Buffer, width: number) {
 
 	const totalPixels = buffer.length;
@@ -142,7 +241,9 @@ function parseRawIndexed(buffer: Buffer, width: number) {
 	return { width, height, indices };
 }
 
-// 🔹 Parse GPL palette
+/**
+ * Read RGB values from a GIMP GPL palette file.
+ */
 function parseGPL(text: string): RGB[] {
 
 	const colors: RGB[] = [];
@@ -155,7 +256,9 @@ function parseGPL(text: string): RGB[] {
 			trimmed.startsWith('#') ||
 			trimmed.startsWith('GIMP') ||
 			trimmed.startsWith('Name')
-		) continue;
+		) {
+			continue;
+		}
 
 		const parts = trimmed.split(/\s+/);
 
@@ -173,7 +276,9 @@ function parseGPL(text: string): RGB[] {
 	return colors;
 }
 
-// 🔹 Webview HTML
+/**
+ * Load the webview HTML and replace the local script path with a webview-safe URI.
+ */
 function getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
 
 	const htmlPath = vscode.Uri.joinPath(extensionUri, 'media', 'index.html');
@@ -189,4 +294,7 @@ function getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
 	return html;
 }
 
+/**
+ * Called when VS Code shuts down the extension.
+ */
 export function deactivate() { }

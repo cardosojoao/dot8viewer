@@ -9,6 +9,15 @@
 <div style="margin-bottom:10px;">
     Width: <input id="width" type="number" style="width:80px;">
     Height: <input id="height" type="number" style="width:80px;">
+    Mode:
+    <select id="mode" style="width:100px;">
+        <option value="linear" selected>Linear</option>
+        <option value="tilesheet">Tilesheet</option>
+    </select>
+    <span id="tileControls" style="display:none;">
+        Tile Width: <input id="tileWidth" type="number" value="8" min="1" style="width:80px;">
+        Tile Height: <input id="tileHeight" type="number" value="8" min="1" style="width:80px;">
+    </span>
     Zoom:
     <select id="zoom" style="width:80px;">
         <option value="1">1x</option>
