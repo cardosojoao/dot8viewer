@@ -22,7 +22,7 @@ const VIEWER_SETTINGS_KEY = 'spectrumViewer.viewerSettings';
  */
 export function activate(context: vscode.ExtensionContext) {
 
-	const command = vscode.commands.registerCommand('spectrumViewer.open', async () => {
+	const command = vscode.commands.registerCommand('dot8Viewer.open', async () => {
 		const storedSettings = getStoredViewerSettings(context);
 
 		// Pick the raw indexed image file.

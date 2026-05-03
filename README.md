@@ -1,53 +1,47 @@
-# dot8viewer README
+# dot8viewer
 
-This is the README for your extension "dot8viewer". After writing up a brief description, we recommend including the following sections.
+A VS Code extension for viewing raw indexed image files, particularly designed for ZX Spectrum Next sprite formats. This extension allows you to visualize raw binary image data using GIMP palette (.gpl) files.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Raw Indexed Image Viewer**: Open and view raw indexed image files in a dedicated webview panel
+- **GPL Palette Support**: Load GIMP palette files (.gpl) to define the color mapping for indexed images
+- **Interactive Viewing**: Zoom in/out, switch between linear and tilesheet display modes
+- **Dynamic Loading**: Change images and palettes directly from the viewer interface
+- **Persistent Settings**: Remembers your last used directories and viewer preferences
+- **Width Configuration**: Specify image width; height is automatically calculated from file size
 
-For example if there is an image subfolder under your extension project workspace:
+## Usage
 
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+2. Run the command "Spectrum Next Viewer"
+3. Select your raw indexed image file
+4. Select a GIMP palette (.gpl) file
+5. Enter the image width in pixels
+6. The image will open in a new panel with interactive controls
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- VS Code 1.118.0 or later
+- Raw indexed image files (binary data where each byte represents a palette index)
+- GIMP palette files (.gpl) containing RGB color definitions
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+This extension does not contribute any VS Code settings. It uses VS Code's global state to remember:
+- Last used image directory
+- Last used palette directory
+- Viewer settings (zoom, mode, tile dimensions)
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- Palette validation: The extension will warn if your image uses color indices beyond what's defined in the palette
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
+Initial release with basic raw indexed image viewing capabilities.
 
 ## Following extension guidelines
 

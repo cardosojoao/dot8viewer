@@ -1,7 +1,7 @@
 {
   "name": "dot8viewer",
   "displayName": "dot8viewer",
-  "description": "Spetrum Next sprite format image  viewer",
+  "description": "Spectrum Next sprite format image viewer",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.118.0"
@@ -14,8 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "spectrumViewer.open",
-        "title": "Spectrum next Viewer"
+        "command": "dot8Viewer.open",
+        "title": "Spectrum Next Viewer"
       }
     ]
   },
