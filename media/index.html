@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<body style="background:#1e1e1e; color:white; font-family:sans-serif;">
+<div style="margin-bottom:10px;">
+    <button id="loadImage">Load Image</button>
+    <button id="loadPalette">Load Palette</button>
+</div>
+
+<div style="margin-bottom:10px;">
+    Width: <input id="width" type="number" style="width:80px;">
+    Height: <input id="height" type="number" style="width:80px;">
+    Zoom:
+    <select id="zoom" style="width:80px;">
+        <option value="1">1x</option>
+        <option value="2">2x</option>
+        <option value="4" selected>4x</option>
+        <option value="8">8x</option>
+    </select>
+    <button id="render">Render</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="viewer.js"></script>
+</body>
+</html>
