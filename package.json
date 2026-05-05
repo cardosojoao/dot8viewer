@@ -1,7 +1,9 @@
 {
   "name": "dot8viewer",
+  "publisher": "bapa",
   "displayName": "dot8viewer",
   "description": "Dot8 sprite format image viewer",
+  "repository": {"type": "git",  "url": "https://github.com/cardosojoao/dot8viewer.git"},
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.118.0"
@@ -15,7 +17,7 @@
     "commands": [
       {
         "command": "dot8Viewer.open",
-        "title": "Dot8 Sprite Viewer"
+        "title": "dot8 Sprite Viewer"
       }
     ]
   },
