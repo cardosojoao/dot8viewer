@@ -109,10 +109,6 @@ window.addEventListener('message', event => {
     }
 });
 
-function updateTileControls() {
-    tileControls.style.display = modeInput.value === 'tilesheet' ? 'inline' : 'none';
-}
-
 /**
  * Show or hide the tile size inputs based on the selected render mode.
  */
@@ -144,20 +140,6 @@ function applyStoredSettings(settings) {
     }
 
     updateTileControls();
-}
-
-function persistSettings(settings) {
-    vscode.postMessage({
-        command: 'saveSettings',
-        settings: {
-            width: settings.width,
-            height: settings.height,
-            zoom: settings.zoom,
-            mode: settings.mode,
-            tileWidth: settings.tileWidth,
-            tileHeight: settings.tileHeight
-        }
-    });
 }
 
 /**
@@ -263,16 +245,24 @@ function render(settings) {
         for (let tileRow = 0; tileRow < tileRows; tileRow++) {
             for (let tileCol = 0; tileCol < tileColumns; tileCol++) {
                 const tileIndex = tileRow * tileColumns + tileCol;
+                // index of begin of tile
                 const tileBufferStart = tileIndex * pixelsPerTile;
 
                 for (let localY = 0; localY < tileHeight; localY++) {
                     for (let localX = 0; localX < tileWidth; localX++) {
+                        // pixel of tile 0..63
                         const pixelInTile = localY * tileWidth + localX;
+                        // real pixel of tile in image
                         const sourceIndex = tileBufferStart + pixelInTile;
+                        // color index
                         const idx = buffer[sourceIndex];
+                        // get color from palette
                         const color = palette[idx] || { r: 0, g: 0, b: 0 };
+
                         const pixelX = tileCol * tileWidth + localX;
                         const pixelY = tileRow * tileHeight + localY;
+                        
+                        
                         const offset = (pixelY * width + pixelX) * 4;
 
                         imageData.data[offset] = color.r;
