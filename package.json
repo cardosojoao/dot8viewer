@@ -5,7 +5,7 @@
   "description": "Dot8 sprite format image viewer",
   "repository": {"type": "git",  "url": "https://github.com/cardosojoao/dot8viewer.git"},
   "icon": "images/logo_black.png",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.118.0"
   },
