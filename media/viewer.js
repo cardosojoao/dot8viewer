@@ -80,6 +80,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
     updateTileControls();
 
+    // Initialize render button state
+    updateRenderButtonState();
+
     // Tell the extension host that the webview can receive startup data.
     vscode.postMessage({ command: 'webviewReady' });
 });
@@ -90,11 +93,13 @@ window.addEventListener('message', event => {
 
     if (msg.command === 'imageLoaded') {
         buffer = msg.buffer;
+        updateRenderButtonState();
         return;
     }
 
     if (msg.command === 'paletteLoaded') {
         palette = msg.palette;
+        updateRenderButtonState();
         return;
     }
 
@@ -106,8 +111,25 @@ window.addEventListener('message', event => {
     if (msg.buffer && msg.palette) {
         buffer = msg.buffer;
         palette = msg.palette;
+        updateRenderButtonState();
     }
 });
+
+/**
+ * Check if we have sufficient data to render.
+ */
+function canRender() {
+    return buffer.length > 0 && palette.length > 0;
+}
+
+/**
+ * Update the render button disabled state based on available data.
+ */
+function updateRenderButtonState() {
+    const hasData = canRender();
+    renderBtn.disabled = !hasData;
+    renderBtn.title = hasData ? 'Render the image' : 'Load image and palette first';
+}
 
 /**
  * Show or hide the tile size inputs based on the selected render mode.
@@ -196,6 +218,12 @@ function getRenderSettings() {
     const tileHeight = parseInt(tileHeightInput.value, 10) || 0;
     let tileColumns = 0;
     let tileRows = 0;
+
+    // Check if we have data to render
+    if (!canRender()) {
+        alert('Please load both image and palette first');
+        return null;
+    }
 
     if (!width || !height) {
         alert('Invalid size');

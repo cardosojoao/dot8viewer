@@ -22,16 +22,28 @@ const VIEWER_SETTINGS_KEY = 'dot8Viewer.viewerSettings';
 /**
  * Open the viewer with the given file URIs and width.
  */
-async function openViewer(context: vscode.ExtensionContext, fileUri: vscode.Uri, paletteUri: vscode.Uri, width: number) {
-	await storeDirectoryForFile(context, LAST_IMAGE_DIR_KEY, fileUri);
-	await storeDirectoryForFile(context, LAST_PALETTE_DIR_KEY, paletteUri);
+async function openViewer(context: vscode.ExtensionContext, fileUri?: vscode.Uri, paletteUri?: vscode.Uri, width?: number) {
+	
+	
+	
+	// fileUri = await resolveImageFile(context, fileUri);
+	// paletteUri = await resolvePaletteFile(context, paletteUri);
+	// width = await resolveWidth(context, width);
+
+	// if (!fileUri || !paletteUri || !width) {
+	// 	return;
+	// }
+
+	// await storeDirectoryForFile(context, LAST_IMAGE_DIR_KEY, fileUri);
+	// await storeDirectoryForFile(context, LAST_PALETTE_DIR_KEY, paletteUri);
 
 	try {
-		const rawBuffer = fs.readFileSync(fileUri.fsPath);
-		const paletteText = fs.readFileSync(paletteUri.fsPath, 'utf-8');
+		// const rawBuffer = fs.readFileSync(fileUri.fsPath);
+		// const paletteText = fs.readFileSync(paletteUri.fsPath, 'utf-8');
 
-		const palette = parseGPL(paletteText);
-		const { height, indices } = parseRawIndexed(rawBuffer, width);
+		const rawBuffer = Buffer.alloc(8);
+		const palette = parseGPL("");
+		const { height, indices } = parseRawIndexed(rawBuffer , 2);
 		const initialData = {
 			buffer: Array.from(rawBuffer),
 			palette,
@@ -39,13 +51,13 @@ async function openViewer(context: vscode.ExtensionContext, fileUri: vscode.Uri,
 			height
 		};
 
-		// Warn if the image uses colours that the palette does not provide.
-		const maxIndex = Math.max(...indices);
-		if (maxIndex >= palette.length) {
-			vscode.window.showWarningMessage(
-				`Palette has ${palette.length} colors but image uses index ${maxIndex}`
-			);
-		}
+		// // Warn if the image uses colours that the palette does not provide.
+		// const maxIndex = Math.max(...indices);
+		// if (maxIndex >= palette.length) {
+		// 	vscode.window.showWarningMessage(
+		// 		`Palette has ${palette.length} colors but image uses index ${maxIndex}`
+		// 	);
+		// }
 
 		const panel = vscode.window.createWebviewPanel(
 			'spectrumViewer',
@@ -136,17 +148,20 @@ async function openViewer(context: vscode.ExtensionContext, fileUri: vscode.Uri,
  */
 export function activate(context: vscode.ExtensionContext) {
 
-	const command = vscode.commands.registerCommand('dot8Viewer.open', async () => {
-		const storedImagePath = context.globalState.get<string>(LAST_IMAGE_FILE_KEY);
-		const storedPalettePath = context.globalState.get<string>(LAST_PALETTE_FILE_KEY);
-		const storedSettings = getStoredViewerSettings(context);
-
-		if (storedImagePath && storedPalettePath && storedSettings.width && fs.existsSync(storedImagePath) && fs.existsSync(storedPalettePath)) {
-			await openViewer(context, vscode.Uri.file(storedImagePath), vscode.Uri.file(storedPalettePath), storedSettings.width);
-		}
+	const command = vscode.commands.registerCommand('dot8viewer.open', async () => {
+		await openViewer(context);
 	});
 
-	context.subscriptions.push(command);
+	const clearCommand = vscode.commands.registerCommand('dot8viewer.clearSettings', async () => {
+		await context.globalState.update(LAST_IMAGE_DIR_KEY, undefined);
+		await context.globalState.update(LAST_PALETTE_DIR_KEY, undefined);
+		await context.globalState.update(LAST_IMAGE_FILE_KEY, undefined);
+		await context.globalState.update(LAST_PALETTE_FILE_KEY, undefined);
+		await context.globalState.update(VIEWER_SETTINGS_KEY, undefined);
+		vscode.window.showInformationMessage('Dot8Viewer settings cleared');
+	});
+
+	context.subscriptions.push(command, clearCommand);
 }
 
 /**
@@ -191,6 +206,75 @@ function getStoredViewerSettings(context: vscode.ExtensionContext): ViewerSettin
  */
 async function storeViewerSettings(context: vscode.ExtensionContext, settings: ViewerSettings) {
 	await context.globalState.update(VIEWER_SETTINGS_KEY, settings);
+}
+
+async function resolveImageFile(context: vscode.ExtensionContext, fileUri?: vscode.Uri): Promise<vscode.Uri | undefined> {
+	if (fileUri && fs.existsSync(fileUri.fsPath)) {
+		return fileUri;
+	}
+
+	const selected = await vscode.window.showOpenDialog({
+		title: 'Select Raw Indexed File',
+		defaultUri: getDefaultOpenUri(context, LAST_IMAGE_DIR_KEY),
+		filters: { 'Sprite format 8 bits': ['spr'] },
+		canSelectMany: false
+	});
+
+	if (!selected?.[0]) {
+		return undefined;
+	}
+
+	await context.globalState.update(LAST_IMAGE_FILE_KEY, selected[0].fsPath);
+	await storeDirectoryForFile(context, LAST_IMAGE_DIR_KEY, selected[0]);
+	return selected[0];
+}
+
+async function resolvePaletteFile(context: vscode.ExtensionContext, paletteUri?: vscode.Uri): Promise<vscode.Uri | undefined> {
+	if (paletteUri && fs.existsSync(paletteUri.fsPath)) {
+		return paletteUri;
+	}
+
+	const selected = await vscode.window.showOpenDialog({
+		title: 'Select GPL Palette',
+		defaultUri: getDefaultOpenUri(context, LAST_PALETTE_DIR_KEY),
+		filters: { 'GIMP Palette': ['gpl'] },
+		canSelectMany: false
+	});
+
+	if (!selected?.[0]) {
+		return undefined;
+	}
+
+	await context.globalState.update(LAST_PALETTE_FILE_KEY, selected[0].fsPath);
+	await storeDirectoryForFile(context, LAST_PALETTE_DIR_KEY, selected[0]);
+	return selected[0];
+}
+
+async function resolveWidth(context: vscode.ExtensionContext, width?: number): Promise<number | undefined> {
+	const storedSettings = getStoredViewerSettings(context);
+	if (typeof width === 'number' && width > 0) {
+		return width;
+	}
+
+	if (typeof storedSettings.width === 'number' && storedSettings.width > 0) {
+		return storedSettings.width;
+	}
+
+	const entered = await vscode.window.showInputBox({
+		prompt: 'Enter image width',
+		value: storedSettings.width?.toString() ?? '128',
+		validateInput: (value) => {
+			const num = Number(value);
+			return Number.isInteger(num) && num > 0 ? null : 'Width must be a positive integer';
+		}
+	});
+
+	if (!entered) {
+		return undefined;
+	}
+
+	const parsed = Number(entered);
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 /**
